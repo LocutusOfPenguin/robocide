@@ -354,42 +354,42 @@ void searchIDLoop(void *posPtr) {
 }
 
 Score searchNode(Node *node) {
-# ifndef NDEBUG
+#	ifndef NDEBUG
 	// Save node_t structure for post-checks.
 	Node preNode=*node;
 
 	// Pre-checks.
 	searchNodePreCheck(node);
-# endif
+#	endif
 
 	// Call main search function.
 	searchNodeInternal(node);
 
-# ifndef NDEBUG
+#	ifndef NDEBUG
 	// Post-checks.
 	searchNodePostCheck(&preNode, node);
-# endif
+#	endif
 
 	return node->score;
 }
 
 Score searchQNode(Node *node) {
-# ifndef NDEBUG
+#	ifndef NDEBUG
 	// Save node_t structure for post-checks.
 	Node preNode=*node;
 
 	// Pre-checks.
 	searchNodePreCheck(node);
 	assert(searchNodeIsQ(node));
-# endif
+#	endif
 
 	// Call main search function.
 	searchQNodeInternal(node);
 
-# ifndef NDEBUG
+#	ifndef NDEBUG
 	// Post-checks.
 	searchNodePostCheck(&preNode, node);
-# endif
+#	endif
 
 	return node->score;
 }
@@ -470,8 +470,7 @@ void searchNodeInternal(Node *node) {
 		Score score=-searchNode(&child);
 		posUndoMove(node->pos);
 
-		if (score>=node->beta)
-		{
+		if (score>=node->beta) {
 			node->bound=BoundLower;
 			node->score=node->beta;
 			return;
