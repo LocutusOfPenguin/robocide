@@ -98,6 +98,9 @@ void uciLoop(void)
 	if (pos==NULL)
 		mainFatalError("Error: Could not create 'working position'.\n");
 
+	// Add 'UCI_Chess960' option to affect the working position.
+	uciOptionNewCheck("UCI_Chess960", (void(*)(void *,bool))&posSetChess960, pos, false);
+
 	// Read lines from the GUI.
 	char *line=NULL;
 	size_t lineSize=0;
