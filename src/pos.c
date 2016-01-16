@@ -29,6 +29,7 @@ struct Pos {
 	Colour stm;
 	unsigned int fullMoveNumber;
 	Key pawnKey, matKey;
+	bool chess960;
 };
 
 const char *posStartFEN="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
@@ -249,6 +250,7 @@ void posDraw(const Pos *pos) {
 	uciWrite("Base hash key: %016"PRIxKey"\n", posGetKey(pos));
 	uciWrite("Pawn hash key: %016"PRIxKey"\n", posGetPawnKey(pos));
 	uciWrite("Material hash key: %016"PRIxKey"\n", posGetMatKey(pos));
+	uciWrite("Chess960: %s\n", posGetChess960(pos) ? "true" : "false");
 }
 
 Colour posGetSTM(const Pos *pos) {
@@ -327,6 +329,14 @@ CastRights posGetCastRights(const Pos *pos) {
 
 Sq posGetEPSq(const Pos *pos) {
 	return pos->data->epSq;
+}
+
+bool posGetChess960(const Pos *pos) {
+	return pos->chess960;
+}
+
+void posSetChess960(Pos *pos, bool value) {
+	pos->chess960=value;
 }
 
 bool posMakeMove(Pos *pos, Move move) {
