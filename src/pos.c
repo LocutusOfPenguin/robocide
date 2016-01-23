@@ -323,7 +323,10 @@ MatInfo posGetMatInfo(const Pos *pos) {
 
 	// Interleave white and black into a single 64 bit integer (we only need 4
 	// bits per piece)
-	return ((black<<4) | white)>>8;
+	MatInfo info=((black<<4) | white)>>8;
+
+	assert((info>>MatInfoBit)==0);
+	return info;
 }
 
 CastRights posGetCastRights(const Pos *pos) {
