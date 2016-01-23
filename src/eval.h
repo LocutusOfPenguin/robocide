@@ -26,4 +26,6 @@ EvalMatType evalGetMatType(const Pos *pos);
 
 const char *evalMatTypeToStr(EvalMatType matType); // NOT thread-safe.
 
+bool evalMatTypeIsValid(EvalMatType type);
+
 #endif
