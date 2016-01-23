@@ -36,15 +36,16 @@ HTable *evalPawnTable=NULL;
 const size_t evalPawnTableDefaultSizeMb=1;
 const size_t evalPawnTableMaxSizeMb=1024*1024; // 1tb
 
-STATICASSERT(ScoreBit<=16);
+STATICASSERT(MatInfoBit<=56);
 STATICASSERT(EvalMatTypeBit<=7);
+STATICASSERT(ScoreBit<=16);
 typedef struct {
-	MatInfo mat;
+	uint64_t computed:1; // Fields: offset, scoreOffset, tempo, weightMG and weightEG are only set if this is 1.
+	uint64_t type:7; // If this is EvalMatTypeInvalid implies this field not yet computed.
+	uint64_t mat:56;
 	VPair16 tempo;
 	int16_t offset;
 	uint8_t weightMG, weightEG;
-	uint8_t computed:1; // Fields: offset, scoreOffset, tempo, weightMG and weightEG are only set if this is 1.
-	uint8_t type:7; // If this is EvalMatTypeInvalid implies this field not yet computed.
 } EvalMatData;
 HTable *evalMatTable=NULL;
 const size_t evalMatTableDefaultSizeMb=1;
@@ -250,9 +251,11 @@ void evalVerify(void);
 
 EvalMatType evalComputeMatType(const Pos *pos);
 
+MatInfo evalMatDataGetMatInfo(const EvalMatData *data);
 EvalMatType evalMatDataGetMatType(const EvalMatData *data);
 bool evalMatDataGetComputed(const EvalMatData *data);
 
+void evalMatDataSetMatInfo(EvalMatData *data, MatInfo info);
 void evalMatDataSetMatType(EvalMatData *data, EvalMatType type);
 void evalMatDataSetComputed(EvalMatData *data, bool computed);
 
@@ -272,7 +275,7 @@ void evalInit(void) {
 
 	// Setup mat hash table.
 	EvalMatData nullEntryMat;
-	nullEntryMat.mat=(matInfoMake(PieceWKing, 0)|matInfoMake(PieceBKing, 0)); // No position can have 0 pieces (kings are always required)
+	evalMatDataSetMatInfo(&nullEntryMat, (matInfoMake(PieceWKing, 0)|matInfoMake(PieceBKing, 0))); // No position can have 0 pieces (kings are always required)
 	evalMatTable=htableNew(sizeof(EvalMatData), &nullEntryMat, evalMatTableDefaultSizeMb);
 	if (evalMatTable==NULL)
 		mainFatalError("Error: Could not allocate mat hash table.\n");
@@ -362,7 +365,7 @@ void evalClear(void) {
 	// Ensure mat!=entry->mat for all positions.
 	// Only entry where this is not the case after clearing is entry with key 0.
 	EvalMatData *entry=htableGrab(evalMatTable, 0);
-	entry->mat=1;
+	evalMatDataSetMatInfo(entry, 1);
 	htableRelease(evalMatTable, 0);
 }
 
@@ -373,8 +376,8 @@ EvalMatType evalGetMatType(const Pos *pos) {
 
 	// If not a match clear entry
 	MatInfo mat=posGetMatInfo(pos);
-	if (entry->mat!=mat) {
-		entry->mat=mat;
+	if (evalMatDataGetMatInfo(entry)!=mat) {
+		evalMatDataSetMatInfo(entry, mat);
 		evalMatDataSetMatType(entry, EvalMatTypeInvalid);
 		evalMatDataSetComputed(entry, false);
 	}
@@ -531,8 +534,8 @@ void evalGetMatData(const Pos *pos, EvalMatData *matData) {
 
 	// If not a match clear entry
 	MatInfo mat=posGetMatInfo(pos);
-	if (entry->mat!=mat) {
-		entry->mat=mat;
+	if (evalMatDataGetMatInfo(entry)!=mat) {
+		evalMatDataSetMatInfo(entry, mat);
 		evalMatDataSetMatType(entry, EvalMatTypeInvalid);
 		evalMatDataSetComputed(entry, false);
 	}
@@ -555,12 +558,12 @@ void evalComputeMatData(const Pos *pos, EvalMatData *matData) {
 #	define G(P) (matInfoGetPieceCount(mat,(P))) // Hard-coded 'mat'.
 
 	// Init data.
-	assert(matData->mat==posGetMatInfo(pos));
+	assert(evalMatDataGetMatInfo(matData)==posGetMatInfo(pos));
 	VPair pairOffset=VPairZero;
 	evalMatDataSetComputed(matData, true);
 	matData->tempo=evalTempoDefault;
 	matData->offset=0;
-	MatInfo mat=(matData->mat & ~matInfoMakeMaskPieceType(PieceTypeKing)); // Remove kings as these as always present.
+	MatInfo mat=(evalMatDataGetMatInfo(matData) & ~matInfoMakeMaskPieceType(PieceTypeKing)); // Remove kings as these as always present.
 	bool wBishopL=((mat & matInfoMakeMaskPiece(PieceWBishopL))!=0);
 	bool bBishopL=((mat & matInfoMakeMaskPiece(PieceBBishopL))!=0);
 	bool wBishopD=((mat & matInfoMakeMaskPiece(PieceWBishopD))!=0);
@@ -1201,12 +1204,22 @@ EvalMatType evalComputeMatType(const Pos *pos) {
 #	undef MAKE
 }
 
+MatInfo evalMatDataGetMatInfo(const EvalMatData *data) {
+	return data->mat;
+}
+
 EvalMatType evalMatDataGetMatType(const EvalMatData *data) {
 	return data->type;
 }
 
 bool evalMatDataGetComputed(const EvalMatData *data) {
 	return data->computed;
+}
+
+void evalMatDataSetMatInfo(EvalMatData *data, MatInfo info) {
+	assert(data!=NULL);
+
+	data->mat=info;
 }
 
 void evalMatDataSetMatType(EvalMatData *data, EvalMatType type) {
