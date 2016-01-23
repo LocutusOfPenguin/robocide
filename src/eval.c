@@ -222,7 +222,7 @@ void evalComputePawnData(const Pos *pos, EvalPawnData *pawnData);
 
 VPair evalPiece(EvalData *data, PieceType type, Sq sq, Colour colour);
 
-Score evalInterpolate(const EvalData *data, const VPair *score);
+Score evalInterpolate(const EvalMatData *data, const VPair *score);
 
 void evalVPairAddTo(VPair *a, const VPair *b);
 void evalVPairSubFrom(VPair *a, const VPair *b);
@@ -420,7 +420,7 @@ Score evaluateInternal(const Pos *pos) {
 		evalVPairSubVPair16From(&score, &data.matData.tempo);
 
 	// Interpolate score based on phase of the game and special material combination considerations.
-	Score scalarScore=evalInterpolate(&data, &score);
+	Score scalarScore=evalInterpolate(&data.matData, &score);
 
 	// Drag score towards 0 as we approach 50-move rule
 	unsigned int halfMoves=posGetHalfMoveNumber(data.pos);
@@ -886,9 +886,9 @@ VPair evalPiece(EvalData *data, PieceType type, Sq sq, Colour colour) {
 	return score;
 }
 
-Score evalInterpolate(const EvalData *data, const VPair *score) {
+Score evalInterpolate(const EvalMatData *data, const VPair *score) {
 	// Interpolate and also scale to centi-pawns
-	return ((data->matData.weightMG*score->mg+data->matData.weightEG*score->eg)*100)/(evalMaterial[PieceTypePawn].mg*256);
+	return ((data->weightMG*score->mg+data->weightEG*score->eg)*100)/(evalMaterial[PieceTypePawn].mg*256);
 }
 
 void evalVPairAddTo(VPair *a, const VPair *b) {
