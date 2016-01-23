@@ -39,7 +39,8 @@ typedef struct {
 	MatInfo mat;
 	EvalMatType type; // If this is EvalMatTypeInvalid implies not yet computed.
 	VPair (*function)(EvalData *data); // If this is NULL implies all entries below have yet to be computed.
-	VPair offset, tempo;
+	VPair offset;
+	VPair16 tempo;
 	uint8_t weightMG, weightEG;
 	Score scoreOffset;
 } EvalMatData;
@@ -94,9 +95,9 @@ TUNECONST VPair evalKingCastlingMobilityNone={0,0};
 TUNECONST VPair evalKingCastlingMobilityK={100,0};
 TUNECONST VPair evalKingCastlingMobilityQ={100,0};
 TUNECONST VPair evalKingCastlingMobilityKQ={200,0};
-TUNECONST VPair evalTempoDefault={35,0};
-TUNECONST VPair evalTempoKQKQ={200,200};
-TUNECONST VPair evalTempoKQQKQQ={500,500};
+TUNECONST VPair16 evalTempoDefault={35,0};
+TUNECONST VPair16 evalTempoKQKQ={200,200};
+TUNECONST VPair16 evalTempoKQQKQQ={500,500};
 TUNECONST Value evalHalfMoveFactor=2048;
 TUNECONST Value evalWeightFactor=144;
 
@@ -316,9 +317,9 @@ void evalInit(void) {
 	evalOptionNewVPair("KingCastlingMobilityK", &evalKingCastlingMobilityK);
 	evalOptionNewVPair("KingCastlingMobilityQ", &evalKingCastlingMobilityQ);
 	evalOptionNewVPair("KingCastlingMobilityKQ", &evalKingCastlingMobilityKQ);
-	evalOptionNewVPair("Tempo", &evalTempoDefault);
-	evalOptionNewVPair("TempoKQKQ", &evalTempoKQKQ);
-	evalOptionNewVPair("TempoKQQKQQ", &evalTempoKQQKQQ);
+	evalOptionNewVPair16("Tempo", &evalTempoDefault);
+	evalOptionNewVPair16("TempoKQKQ", &evalTempoKQKQ);
+	evalOptionNewVPair16("TempoKQQKQQ", &evalTempoKQQKQQ);
 	uciOptionNewSpin("HalfMoveFactor", &evalSetValue, &evalHalfMoveFactor, 1, 32768, evalHalfMoveFactor);
 	uciOptionNewSpin("WeightFactor", &evalSetValue, &evalWeightFactor, 1, 1024, evalWeightFactor);
 # endif
@@ -408,9 +409,9 @@ Score evaluateInternal(const Pos *pos) {
 
 	// Tempo bonus.
 	if (posGetSTM(pos)==ColourWhite)
-		evalVPairAddTo(&score, &data.matData.tempo);
+		evalVPairAddVPair16To(&score, &data.matData.tempo);
 	else
-		evalVPairSubFrom(&score, &data.matData.tempo);
+		evalVPairSubVPair16From(&score, &data.matData.tempo);
 
 	// Interpolate score based on phase of the game and special material combination considerations.
 	Score scalarScore=evalInterpolate(&data, &score);
@@ -477,7 +478,7 @@ VPair evaluateKPvK(EvalData *data) {
 	switch(result) {
 		case BitBaseResultDraw:
 			data->matData.offset=VPairZero;
-			data->matData.tempo=VPairZero;
+			data->matData.tempo=VPair16Zero;
 			data->matData.scoreOffset=0;
 			return VPairZero;
 		break;
