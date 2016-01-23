@@ -323,7 +323,7 @@ MatInfo posGetMatInfo(const Pos *pos) {
 
 	// Interleave white and black into a single 64 bit integer (we only need 4
 	// bits per piece)
-	return ((black<<4) | white);
+	return ((black<<4) | white)>>8;
 }
 
 CastRights posGetCastRights(const Pos *pos) {
@@ -1478,7 +1478,7 @@ bool posIsConsistent(const Pos *pos) {
 
 unsigned int matInfoShift(Piece piece) {
 	assert(pieceIsValid(piece));
-	return 4*(2*pieceGetType(piece)+pieceGetColour(piece));
+	return 4*(2*(pieceGetType(piece)-1)+pieceGetColour(piece));
 }
 
 bool posMoveIsPseudoLegalInternal(const Pos *pos, Move move) {

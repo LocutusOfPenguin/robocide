@@ -44,6 +44,7 @@ typedef enum {
 #define CastRightsBit 4
 
 typedef uint64_t MatInfo; // Holds info on number of pieces.
+#define MatInfoBit (64-8)
 
 #define MAKE(p,n) matInfoMake((p),(n))
 #define MASK(t) matInfoMakeMaskPieceType(t)
