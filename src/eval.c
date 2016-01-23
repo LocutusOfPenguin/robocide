@@ -37,13 +37,14 @@ const size_t evalPawnTableDefaultSizeMb=1;
 const size_t evalPawnTableMaxSizeMb=1024*1024; // 1tb
 
 STATICASSERT(ScoreBit<=16);
+STATICASSERT(EvalMatTypeBit<=7);
 typedef struct {
 	MatInfo mat;
-	EvalMatType type; // If this is EvalMatTypeInvalid implies not yet computed.
-	VPair (*function)(EvalData *data); // If this is NULL implies all entries below have yet to be computed.
 	VPair16 tempo;
 	int16_t offset;
 	uint8_t weightMG, weightEG;
+	uint8_t computed:1; // Fields: offset, scoreOffset, tempo, weightMG and weightEG are only set if this is 1.
+	uint8_t type:7; // If this is EvalMatTypeInvalid implies this field not yet computed.
 } EvalMatData;
 HTable *evalMatTable=NULL;
 const size_t evalMatTableDefaultSizeMb=1;
@@ -249,6 +250,12 @@ void evalVerify(void);
 
 EvalMatType evalComputeMatType(const Pos *pos);
 
+EvalMatType evalMatDataGetMatType(const EvalMatData *data);
+bool evalMatDataGetComputed(const EvalMatData *data);
+
+void evalMatDataSetMatType(EvalMatData *data, EvalMatType type);
+void evalMatDataSetComputed(EvalMatData *data, bool computed);
+
 ////////////////////////////////////////////////////////////////////////////////
 // Public functions.
 ////////////////////////////////////////////////////////////////////////////////
@@ -368,16 +375,16 @@ EvalMatType evalGetMatType(const Pos *pos) {
 	MatInfo mat=posGetMatInfo(pos);
 	if (entry->mat!=mat) {
 		entry->mat=mat;
-		entry->type=EvalMatTypeInvalid;
-		entry->function=NULL;
+		evalMatDataSetMatType(entry, EvalMatTypeInvalid);
+		evalMatDataSetComputed(entry, false);
 	}
 
 	// If no data already, compute
-	if (entry->type==EvalMatTypeInvalid)
-		entry->type=evalComputeMatType(pos);
+	if (evalMatDataGetMatType(entry)==EvalMatTypeInvalid)
+		evalMatDataSetMatType(entry, evalComputeMatType(pos));
 
 	// Copy data to return it
-	EvalMatType type=entry->type;
+	EvalMatType type=evalMatDataGetMatType(entry);
 
 	// We are finished with Entry, release lock
 	htableRelease(evalMatTable, key);
@@ -407,7 +414,30 @@ Score evaluateInternal(const Pos *pos) {
 	evalGetMatData(pos, &data.matData);
 
 	// Evaluate.
-	VPair score=data.matData.function(&data);
+	VPair score=VPairZero;
+	switch(evalMatDataGetMatType(&data.matData)) {
+		case EvalMatTypeInvalid:
+			assert(false);
+		break;
+		case EvalMatTypeOther:
+			score=evaluateDefault(&data);
+		break;
+		case EvalMatTypeDraw:
+			return 0;
+		break;
+		case EvalMatTypeKNNvK:
+			score=evaluateDefault(&data);
+		break;
+		case EvalMatTypeKPvK:
+			score=evaluateKPvK(&data);
+		break;
+		case EvalMatTypeKBPvK:
+			score=evaluateDefault(&data);
+		break;
+		case EvalMatTypeNB:
+			assert(false);
+		break;
+	}
 
 	// Tempo bonus.
 	if (posGetSTM(pos)==ColourWhite)
@@ -503,14 +533,14 @@ void evalGetMatData(const Pos *pos, EvalMatData *matData) {
 	MatInfo mat=posGetMatInfo(pos);
 	if (entry->mat!=mat) {
 		entry->mat=mat;
-		entry->type=EvalMatTypeInvalid;
-		entry->function=NULL;
+		evalMatDataSetMatType(entry, EvalMatTypeInvalid);
+		evalMatDataSetComputed(entry, false);
 	}
 
 	// If no data already, compute.
-	if (entry->type==EvalMatTypeInvalid)
-		entry->type=evalGetMatType(pos);
-	if (entry->function==NULL)
+	if (evalMatDataGetMatType(entry)==EvalMatTypeInvalid)
+		evalMatDataSetMatType(entry, evalGetMatType(pos));
+	if (!evalMatDataGetComputed(entry))
 		evalComputeMatData(pos, entry);
 
 	// Copy data to return it.
@@ -526,8 +556,8 @@ void evalComputeMatData(const Pos *pos, EvalMatData *matData) {
 
 	// Init data.
 	assert(matData->mat==posGetMatInfo(pos));
-	matData->function=&evaluateDefault;
 	VPair pairOffset=VPairZero;
+	evalMatDataSetComputed(matData, true);
 	matData->tempo=evalTempoDefault;
 	matData->offset=0;
 	MatInfo mat=(matData->mat & ~matInfoMakeMaskPieceType(PieceTypeKing)); // Remove kings as these as always present.
@@ -549,7 +579,7 @@ void evalComputeMatData(const Pos *pos, EvalMatData *matData) {
 
 	// Specific material combinations.
 	unsigned int factor=1024;
-	switch(matData->type) {
+	switch(evalMatDataGetMatType(matData)) {
 		case EvalMatTypeInvalid:
 			assert(false);
 		break;
@@ -703,8 +733,6 @@ void evalComputeMatData(const Pos *pos, EvalMatData *matData) {
 			factor/=128;
 		break;
 		case EvalMatTypeKPvK:
-			// Special evaluation function.
-			matData->function=&evaluateKPvK;
 		break;
 		case EvalMatTypeKBPvK:
 		break;
@@ -1173,3 +1201,23 @@ EvalMatType evalComputeMatType(const Pos *pos) {
 #	undef MAKE
 }
 
+EvalMatType evalMatDataGetMatType(const EvalMatData *data) {
+	return data->type;
+}
+
+bool evalMatDataGetComputed(const EvalMatData *data) {
+	return data->computed;
+}
+
+void evalMatDataSetMatType(EvalMatData *data, EvalMatType type) {
+	assert(data!=NULL);
+	assert(evalMatTypeIsValid(type));
+
+	data->type=type;
+}
+
+void evalMatDataSetComputed(EvalMatData *data, bool computed) {
+	assert(data!=NULL);
+
+	data->computed=computed;
+}
