@@ -16,6 +16,7 @@
 #include "square.h"
 #include "tune.h"
 #include "uci.h"
+#include "util.h"
 
 typedef int32_t Value;
 typedef struct { Value mg, eg; } VPair;
@@ -35,14 +36,15 @@ HTable *evalPawnTable=NULL;
 const size_t evalPawnTableDefaultSizeMb=1;
 const size_t evalPawnTableMaxSizeMb=1024*1024; // 1tb
 
+STATICASSERT(ScoreBit<=16);
 typedef struct {
 	MatInfo mat;
 	EvalMatType type; // If this is EvalMatTypeInvalid implies not yet computed.
 	VPair (*function)(EvalData *data); // If this is NULL implies all entries below have yet to be computed.
 	VPair offset;
 	VPair16 tempo;
+	int16_t scoreOffset;
 	uint8_t weightMG, weightEG;
-	Score scoreOffset;
 } EvalMatData;
 HTable *evalMatTable=NULL;
 const size_t evalMatTableDefaultSizeMb=1;
