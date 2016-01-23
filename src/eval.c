@@ -36,13 +36,16 @@ HTable *evalPawnTable=NULL;
 const size_t evalPawnTableDefaultSizeMb=1;
 const size_t evalPawnTableMaxSizeMb=1024*1024; // 1tb
 
-STATICASSERT(MatInfoBit<=56);
-STATICASSERT(EvalMatTypeBit<=7);
+STATICASSERT(MatInfoBit+EvalMatTypeBit+1<=64);
 STATICASSERT(ScoreBit<=16);
+#define EvalMatDataComputedTypeMatShiftMat 0
+#define EvalMatDataComputedTypeMatShiftType (EvalMatDataComputedTypeMatShiftMat+MatInfoBit)
+#define EvalMatDataComputedTypeMatShiftComputed (EvalMatDataComputedTypeMatShiftType+EvalMatTypeBit)
+#define EvalMatDataComputedTypeMatMaskMat  (((((uint64_t)1)<<MatInfoBit)-1)<<EvalMatDataComputedTypeMatShiftMat)
+#define EvalMatDataComputedTypeMatMaskType (((((uint64_t)1)<<EvalMatTypeBit)-1)<<EvalMatDataComputedTypeMatShiftType)
+#define EvalMatDataComputedTypeMatMaskComputed (((uint64_t)1)<<EvalMatDataComputedTypeMatShiftComputed)
 typedef struct {
-	uint64_t computed:1; // Fields: offset, scoreOffset, tempo, weightMG and weightEG are only set if this is 1.
-	uint64_t type:7; // If this is EvalMatTypeInvalid implies this field not yet computed.
-	uint64_t mat:56;
+	uint64_t computedTypeMat; // Three fields stored in single 64 bit integer. Fields: offset, scoreOffset, tempo, weightMG and weightEG are only set if computed is true. If type is EvalMatTypeInvalid implies this field not yet computed.
 	VPair16 tempo;
 	int16_t offset;
 	uint8_t weightMG, weightEG;
@@ -1205,32 +1208,38 @@ EvalMatType evalComputeMatType(const Pos *pos) {
 }
 
 MatInfo evalMatDataGetMatInfo(const EvalMatData *data) {
-	return data->mat;
+	return (data->computedTypeMat & EvalMatDataComputedTypeMatMaskMat)>>EvalMatDataComputedTypeMatShiftMat;
 }
 
 EvalMatType evalMatDataGetMatType(const EvalMatData *data) {
-	return data->type;
+	EvalMatType type=(data->computedTypeMat & EvalMatDataComputedTypeMatMaskType)>>EvalMatDataComputedTypeMatShiftType;
+	assert(evalMatTypeIsValid(type));
+	return type;
 }
 
 bool evalMatDataGetComputed(const EvalMatData *data) {
-	return data->computed;
+	bool ret=(data->computedTypeMat & EvalMatDataComputedTypeMatMaskComputed)>>EvalMatDataComputedTypeMatShiftComputed;
+	return ret;
 }
 
 void evalMatDataSetMatInfo(EvalMatData *data, MatInfo info) {
 	assert(data!=NULL);
 
-	data->mat=info;
+	data->computedTypeMat&=~EvalMatDataComputedTypeMatMaskMat;
+	data->computedTypeMat|=((uint64_t)info)<<EvalMatDataComputedTypeMatShiftMat;
 }
 
 void evalMatDataSetMatType(EvalMatData *data, EvalMatType type) {
 	assert(data!=NULL);
 	assert(evalMatTypeIsValid(type));
 
-	data->type=type;
+	data->computedTypeMat&=~EvalMatDataComputedTypeMatMaskType;
+	data->computedTypeMat|=((uint64_t)type)<<EvalMatDataComputedTypeMatShiftType;
 }
 
 void evalMatDataSetComputed(EvalMatData *data, bool computed) {
 	assert(data!=NULL);
 
-	data->computed=computed;
+	data->computedTypeMat&=~EvalMatDataComputedTypeMatMaskComputed;
+	data->computedTypeMat|=((uint64_t)computed)<<EvalMatDataComputedTypeMatShiftComputed;
 }
