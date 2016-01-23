@@ -41,9 +41,8 @@ typedef struct {
 	MatInfo mat;
 	EvalMatType type; // If this is EvalMatTypeInvalid implies not yet computed.
 	VPair (*function)(EvalData *data); // If this is NULL implies all entries below have yet to be computed.
-	VPair offset;
 	VPair16 tempo;
-	int16_t scoreOffset;
+	int16_t offset;
 	uint8_t weightMG, weightEG;
 } EvalMatData;
 HTable *evalMatTable=NULL;
@@ -410,9 +409,6 @@ Score evaluateInternal(const Pos *pos) {
 	// Evaluate.
 	VPair score=data.matData.function(&data);
 
-	// Material combination offset.
-	evalVPairAddTo(&score, &data.matData.offset);
-
 	// Tempo bonus.
 	if (posGetSTM(pos)==ColourWhite)
 		evalVPairAddVPair16To(&score, &data.matData.tempo);
@@ -422,13 +418,13 @@ Score evaluateInternal(const Pos *pos) {
 	// Interpolate score based on phase of the game and special material combination considerations.
 	Score scalarScore=evalInterpolate(&data.matData, &score);
 
+	// Add material combination offset.
+	scalarScore+=data.matData.offset;
+
 	// Drag score towards 0 as we approach 50-move rule
 	unsigned int halfMoves=posGetHalfMoveNumber(data.pos);
 	assert(halfMoves<128);
 	scalarScore=(scalarScore*evalHalfMoveFactors[halfMoves])/256;
-
-	// Add score offset
-	scalarScore+=data.matData.scoreOffset;
 
 	// Adjust for side to move
 	if (posGetSTM(data.pos)==ColourBlack)
@@ -483,14 +479,13 @@ VPair evaluateKPvK(EvalData *data) {
 	BitBaseResult result=bitbaseProbe(data->pos);
 	switch(result) {
 		case BitBaseResultDraw:
-			data->matData.offset=VPairZero;
 			data->matData.tempo=VPair16Zero;
-			data->matData.scoreOffset=0;
+			data->matData.offset=0;
 			return VPairZero;
 		break;
 		case BitBaseResultWin: {
 			Colour attacker=(posGetBBPiece(data->pos, PieceWPawn)!=BBNone ? ColourWhite : ColourBlack);
-			data->matData.scoreOffset+=(attacker==ColourWhite ? ScoreHardWin : -ScoreHardWin);
+			data->matData.offset+=(attacker==ColourWhite ? ScoreHardWin : -ScoreHardWin);
 			return evaluateDefault(data);
 		} break;
 	}
@@ -532,9 +527,9 @@ void evalComputeMatData(const Pos *pos, EvalMatData *matData) {
 	// Init data.
 	assert(matData->mat==posGetMatInfo(pos));
 	matData->function=&evaluateDefault;
-	matData->offset=VPairZero;
+	VPair pairOffset=VPairZero;
 	matData->tempo=evalTempoDefault;
-	matData->scoreOffset=0;
+	matData->offset=0;
 	MatInfo mat=(matData->mat & ~matInfoMakeMaskPieceType(PieceTypeKing)); // Remove kings as these as always present.
 	bool wBishopL=((mat & matInfoMakeMaskPiece(PieceWBishopL))!=0);
 	bool bBishopL=((mat & matInfoMakeMaskPiece(PieceBBishopL))!=0);
@@ -644,9 +639,9 @@ void evalComputeMatData(const Pos *pos, EvalMatData *matData) {
 
 					// Single side with material should be easy win (at least a rook ahead).
 					if ((mat & matWhite)==mat)
-						matData->scoreOffset+=ScoreEasyWin;
+						matData->offset+=ScoreEasyWin;
 					else if ((mat & matBlack)==mat)
-						matData->scoreOffset-=ScoreEasyWin;
+						matData->offset-=ScoreEasyWin;
 					else if (mat==(M(PieceWQueen,1)|M(PieceBRook,1))|| // KQvKR.
 					         mat==(M(PieceBQueen,1)|M(PieceWRook,1)))
 						factor/=2;
@@ -727,27 +722,30 @@ void evalComputeMatData(const Pos *pos, EvalMatData *matData) {
 	}
 
 	// Material.
-	evalVPairAddMulTo(&matData->offset, &evalMaterial[PieceTypePawn], G(PieceWPawn)-G(PieceBPawn));
-	evalVPairAddMulTo(&matData->offset, &evalMaterial[PieceTypeKnight], G(PieceWKnight)-G(PieceBKnight));
-	evalVPairAddMulTo(&matData->offset, &evalMaterial[PieceTypeBishopL], whiteBishopCount-blackBishopCount);
-	evalVPairAddMulTo(&matData->offset, &evalMaterial[PieceTypeRook], G(PieceWRook)-G(PieceBRook));
-	evalVPairAddMulTo(&matData->offset, &evalMaterial[PieceTypeQueen], G(PieceWQueen)-G(PieceBQueen));
+	evalVPairAddMulTo(&pairOffset, &evalMaterial[PieceTypePawn], G(PieceWPawn)-G(PieceBPawn));
+	evalVPairAddMulTo(&pairOffset, &evalMaterial[PieceTypeKnight], G(PieceWKnight)-G(PieceBKnight));
+	evalVPairAddMulTo(&pairOffset, &evalMaterial[PieceTypeBishopL], whiteBishopCount-blackBishopCount);
+	evalVPairAddMulTo(&pairOffset, &evalMaterial[PieceTypeRook], G(PieceWRook)-G(PieceBRook));
+	evalVPairAddMulTo(&pairOffset, &evalMaterial[PieceTypeQueen], G(PieceWQueen)-G(PieceBQueen));
 
 	// Knight pawn affinity.
 	unsigned int knightAffW=G(PieceWKnight)*G(PieceWPawn);
 	unsigned int knightAffB=G(PieceBKnight)*G(PieceBPawn);
-	evalVPairAddMulTo(&matData->offset, &evalKnightPawnAffinity, knightAffW-knightAffB);
+	evalVPairAddMulTo(&pairOffset, &evalKnightPawnAffinity, knightAffW-knightAffB);
 
 	// Rook pawn affinity.
 	unsigned int rookAffW=G(PieceWRook)*G(PieceWPawn);
 	unsigned int rookAffB=G(PieceBRook)*G(PieceBPawn);
-	evalVPairAddMulTo(&matData->offset, &evalRookPawnAffinity, rookAffW-rookAffB);
+	evalVPairAddMulTo(&pairOffset, &evalRookPawnAffinity, rookAffW-rookAffB);
 
 	// Bishop pair bonus
 	if (wBishopL && wBishopD)
-		evalVPairAddTo(&matData->offset, &evalBishopPair);
+		evalVPairAddTo(&pairOffset, &evalBishopPair);
 	if (bBishopL && bBishopD)
-		evalVPairSubFrom(&matData->offset, &evalBishopPair);
+		evalVPairSubFrom(&pairOffset, &evalBishopPair);
+
+	// Add pairOffset to offset field.
+	matData->offset+=evalInterpolate(matData, &pairOffset);
 
 #	undef G
 #	undef M
