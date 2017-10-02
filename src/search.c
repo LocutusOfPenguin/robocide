@@ -240,6 +240,10 @@ void searchLimitInit(SearchLimit *limit, TimeMs startTime) {
 	limit->movesToGo=0;
 	limit->depth=DepthMax-1;
 	limit->nodes=0;
+    int j;
+    for(j=0;j<MovesMax;++j)
+        limit->searchmoves[j]=MoveInvalid;
+    limit->searchmovesNumber = 0;
 }
 
 void searchLimitSetInfinite(SearchLimit *limit, bool infinite) {
@@ -271,7 +275,7 @@ void searchLimitSetMovesToGo(SearchLimit *limit, unsigned int movesToGo) {
 }
 
 void searchLimitAddMove(SearchLimit *limit, Move move) {
-	// TODO: Implement this.
+    limit->searchmoves[limit->searchmovesNumber++] = move;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -509,6 +513,13 @@ void searchNodeInternal(Node *node) {
 		if (searchShowCurrmove && node->ply==0)
 			posMoveToStr(node->pos, move, moveStr); // Must do this before making the move.
 
+        // JP!
+        int j, found = false;
+        for(j=0;j<searchLimit.searchmovesNumber;++j) {
+            if (searchLimit.searchmoves[j] == move) found = true;
+        }
+        if(!found && searchLimit.searchmovesNumber) continue;
+
 		// Make move (might leave us in check, if so skip).
 		MoveType moveType=posMoveGetType(node->pos, move);
 		if (!posMakeMove(node->pos, move))
@@ -629,8 +640,6 @@ void searchNodeInternal(Node *node) {
 
 	// Update transposition table.
 	ttWrite(node->pos, node->ply, node->depth, bestMove, node->score, node->bound);
-
-	return;
 }
 
 void searchQNodeInternal(Node *node) {
@@ -678,6 +687,13 @@ void searchQNodeInternal(Node *node) {
 		if (!node->inCheck && !posMoveIsPromotion(node->pos, move) && seeSign(node->pos, moveGetFromSq(move), moveGetToSq(move))<0)
 			continue;
 
+        // JP!
+        int j, found = false;
+        for(j=0;j<searchLimit.searchmovesNumber;++j) {
+            if (searchLimit.searchmoves[j] == move) found = true;
+        }
+        if(!found && searchLimit.searchmovesNumber) continue;
+
 		// Search move.
 		if (!posMakeMove(node->pos, move))
 			continue;
@@ -722,8 +738,6 @@ void searchQNodeInternal(Node *node) {
 	node->score=alpha;
 	assert(node->bound!=BoundNone);
 	assert(scoreIsValid(node->score));
-
-	return;
 }
 
 bool searchIsTimeUp(void) {
