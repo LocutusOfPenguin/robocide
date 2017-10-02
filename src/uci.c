@@ -123,7 +123,6 @@ void uciLoop(void)
 			searchLimitInit(&limit, recvTime);
 			bool inSearchMoves=false;
 			while((part=strtok_r(NULL, " ", &savePtr))!=NULL) {
-				uciWrite(part);
 				if ((utilStrEqual(part, "wtime") && posGetSTM(pos)==ColourWhite) ||
 						(utilStrEqual(part, "btime") && posGetSTM(pos)==ColourBlack)) {
 					inSearchMoves=false;
@@ -155,10 +154,9 @@ void uciLoop(void)
 						searchLimitSetDepth(&limit, atoi(part));
 				} else if (utilStrEqual(part, "searchmoves"))
 					inSearchMoves=true;
-				/*else*/ if (inSearchMoves) {
+       /*else*/ if (inSearchMoves) {
 					Move move=posMoveFromStr(pos, part);
 					if (moveIsValid(move) && posCanMakeMove(pos, move)) {
-						//uciWrite('PIEP');
 						searchLimitAddMove(&limit, move);
 					}
 				}

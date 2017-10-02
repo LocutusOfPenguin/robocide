@@ -518,6 +518,9 @@ void searchNodeInternal(Node *node) {
         for(j=0;j<searchLimit.searchmovesNumber;++j) {
             if (searchLimit.searchmoves[j] == move) found = true;
         }
+//        if(node->ply==0) {
+//            printf("mv=%i sm=%i found=%i \n", move, searchLimit.searchmoves[0], found);
+//        }
         if(!found && searchLimit.searchmovesNumber) continue;
 
 		// Make move (might leave us in check, if so skip).
@@ -692,6 +695,9 @@ void searchQNodeInternal(Node *node) {
         for(j=0;j<searchLimit.searchmovesNumber;++j) {
             if (searchLimit.searchmoves[j] == move) found = true;
         }
+//        if(node->ply==0) {
+//            printf("mv=%i sm=%i found=%i \n", move, searchLimit.searchmoves[0], found);
+//        }
         if(!found && searchLimit.searchmovesNumber) continue;
 
 		// Search move.
