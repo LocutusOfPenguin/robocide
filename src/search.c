@@ -514,14 +514,14 @@ void searchNodeInternal(Node *node) {
 			posMoveToStr(node->pos, move, moveStr); // Must do this before making the move.
 
         // JP!
-        int j, found = false;
+        int j, found = (searchLimit.searchmovesNumber == 0);
         for(j=0;j<searchLimit.searchmovesNumber;++j) {
             if (searchLimit.searchmoves[j] == move) found = true;
         }
-//        if(node->ply==0) {
-//            printf("mv=%i sm=%i found=%i \n", move, searchLimit.searchmoves[0], found);
-//        }
-        if(!found && searchLimit.searchmovesNumber) continue;
+        if(node->ply==0) {
+            printf("NS: mv=%i sm=%i len=%i found=%i \n", move, searchLimit.searchmoves[0], searchLimit.searchmovesNumber, found);
+        }
+        if(!found) continue;
 
 		// Make move (might leave us in check, if so skip).
 		MoveType moveType=posMoveGetType(node->pos, move);
@@ -691,14 +691,14 @@ void searchQNodeInternal(Node *node) {
 			continue;
 
         // JP!
-        int j, found = false;
+        int j, found = (searchLimit.searchmovesNumber == 0);
         for(j=0;j<searchLimit.searchmovesNumber;++j) {
             if (searchLimit.searchmoves[j] == move) found = true;
         }
-//        if(node->ply==0) {
-//            printf("mv=%i sm=%i found=%i \n", move, searchLimit.searchmoves[0], found);
-//        }
-        if(!found && searchLimit.searchmovesNumber) continue;
+        if(node->ply==0) {
+            printf("QS: mv=%i sm=%i len=%i found=%i \n", move, searchLimit.searchmoves[0], searchLimit.searchmovesNumber, found);
+        }
+        if(!found) continue;
 
 		// Search move.
 		if (!posMakeMove(node->pos, move))

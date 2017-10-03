@@ -6,3 +6,5 @@
 robocide
 # Backup files
 *~
+# PyCharm
+.idea/
