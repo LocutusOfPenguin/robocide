@@ -439,7 +439,7 @@ void searchNodeInternal(Node *node) {
 
 	// Check transposition table.
 	Move ttMove=MoveInvalid;
-	unsigned int ttDepth;
+    Depth ttDepth;
 	Score ttScore;
 	Bound ttBound;
 	if (ttRead(node->pos, node->ply, &ttMove, &ttDepth, &ttScore, &ttBound)) {
@@ -448,15 +448,26 @@ void searchNodeInternal(Node *node) {
 		assert(scoreIsValid(ttScore));
 		assert(ttBound!=BoundNone);
 
-		// Check for cutoff.
-		if (ttDepth>=node->depth &&
-		    (ttBound==BoundExact ||
-		    (ttBound==BoundLower && (ttScore>=node->beta)) ||
-		    (ttBound==BoundUpper && (ttScore<=node->alpha)))) {
-			node->bound=ttBound;
-			node->score=ttScore;
-			return;
-		}
+        // JP!
+        bool check_cutoff = true;
+        if (node->ply == 0) {
+            bool found = (searchLimit.searchmovesNumber == 0);
+            for (int j = 0; j < searchLimit.searchmovesNumber; ++j) {
+                if (searchLimit.searchmoves[j] == ttMove) found = true;
+            }
+            if(!found) check_cutoff = false;
+        }
+        if (check_cutoff) {
+            // Check for cutoff.
+            if (ttDepth >= node->depth &&
+                (ttBound == BoundExact ||
+                 (ttBound == BoundLower && (ttScore >= node->beta)) ||
+                 (ttBound == BoundUpper && (ttScore <= node->alpha)))) {
+                node->bound = ttBound;
+                node->score = ttScore;
+                return;
+            }
+        }
 	}
 
 	// Null move pruning.
@@ -510,19 +521,18 @@ void searchNodeInternal(Node *node) {
 	while((move=movesNext(&moves))!=MoveInvalid) {
 		// Find move string for UCI output.
 		char moveStr[8]; // Only used if root node.
-		if (searchShowCurrmove && node->ply==0)
+		if (/*searchShowCurrmove &&*/ node->ply==0)
 			posMoveToStr(node->pos, move, moveStr); // Must do this before making the move.
 
         // JP!
-        int j, found = (searchLimit.searchmovesNumber == 0);
-        for(j=0;j<searchLimit.searchmovesNumber;++j) {
-            if (searchLimit.searchmoves[j] == move) found = true;
-        }
         if(node->ply==0) {
-            printf("NS: mv=%i sm=%i len=%i found=%i \n", move, searchLimit.searchmoves[0], searchLimit.searchmovesNumber, found);
+            bool found = (searchLimit.searchmovesNumber == 0);
+            for (int j = 0; j < searchLimit.searchmovesNumber; ++j) {
+                if (searchLimit.searchmoves[j] == move) found = true;
+            }
+			printf("mv: %s found: %u\n", moveStr, found);
+            if (!found) continue;
         }
-        if(!found) continue;
-
 		// Make move (might leave us in check, if so skip).
 		MoveType moveType=posMoveGetType(node->pos, move);
 		if (!posMakeMove(node->pos, move))
@@ -691,15 +701,13 @@ void searchQNodeInternal(Node *node) {
 			continue;
 
         // JP!
-        int j, found = (searchLimit.searchmovesNumber == 0);
-        for(j=0;j<searchLimit.searchmovesNumber;++j) {
-            if (searchLimit.searchmoves[j] == move) found = true;
-        }
         if(node->ply==0) {
-            printf("QS: mv=%i sm=%i len=%i found=%i \n", move, searchLimit.searchmoves[0], searchLimit.searchmovesNumber, found);
+            bool found = (searchLimit.searchmovesNumber == 0);
+            for (int j = 0; j < searchLimit.searchmovesNumber; ++j) {
+                if (searchLimit.searchmoves[j] == move) found = true;
+            }
+            if (!found) continue;
         }
-        if(!found) continue;
-
 		// Search move.
 		if (!posMakeMove(node->pos, move))
 			continue;
